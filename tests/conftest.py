@@ -20,15 +20,27 @@ def pytest_addoption(parser):
 @pytest.fixture(scope="class")
 def setup(request):
     global driver
-    browser_name = request.config.getoption("browser_name")
-    if browser_name == "chrome":
-        service = Service("../drivers/chromedriver")
-        driver = webdriver.Chrome(service=service)
-        driver.get("https://www.google.com")
-        driver.maximize_window()
-        request.cls.driver = driver
+    ui_marker = request.node.get_closest_marker("ui")
+    print(ui_marker)
+    if ui_marker:
+        browser_name = request.config.getoption("browser_name")
+        if browser_name == "chrome":
+            service = Service("../drivers/chromedriver")
+            driver = webdriver.Chrome(service=service)
+            driver.get("https://www.google.com")
+            driver.maximize_window()
+            request.cls.driver = driver
+            yield
+            driver.close()
+    else:
         yield
-        driver.close()
+
+
+# Hook to capture pytest markers (for debugging or custom logic)
+def pytest_collection_modifyitems(config, items):
+    for item in items:
+        if "ui" in item.keywords and not item.get_closest_marker("ui"):
+            item.add_marker(pytest.mark.ui)
 
 
 @pytest.mark.hookwrapper
@@ -52,4 +64,5 @@ def pytest_runtest_makereport(item):
 
 def _capture_screenshot(screenshot_name):
     time.sleep(5)
-    driver.get_screenshot_as_file('..\\screenshots\\%s' % screenshot_name)
+    if driver is not None:
+        driver.get_screenshot_as_file('..\\screenshots\\%s' % screenshot_name)
